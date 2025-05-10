@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Dodaj dozymetr</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'fontawesome/css/all.min.css' %}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .form-card {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            min-width: 350px;
+        }
+        .form-card h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            width: 100%;
+        }
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #f8d7da;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            color: #000;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .back-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 18px rgba(0, 0, 0, 0.15);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="form-card">
+    <h1><i class="fas fa-radiation text-danger"></i> Dodaj dozymetr</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-warning mt-3"><i class="fas fa-save"></i> Zapisz</button>
+    </form>
+    <div style="text-align: center;">
+        <a href="{% url 'dozymetr_list' %}" class="back-button">
+            <i class="fas fa-arrow-left"></i> Powrót do listy dozymetrów</a>
+    </div>
+
+{% include "cursor.html" %}
+
+</div>
+</body>
+</html>

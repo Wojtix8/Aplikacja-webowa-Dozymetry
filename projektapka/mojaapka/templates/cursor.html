@@ -1,0 +1,26 @@
+<!-- templates/_cursor.html -->
+<div id="customCursor" class="custom-cursor">☢️</div>
+
+<script>
+    const cursor = document.getElementById("customCursor");
+    document.addEventListener("mousemove", (e) => {
+        cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    });
+</script>
+
+<style>
+    body {
+        cursor: none;
+    }
+    .custom-cursor {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 30px;
+        height: 30px;
+        font-size: 24px;
+        pointer-events: none;
+        z-index: 9999;
+        transition: transform 0.05s linear;
+    }
+</style>

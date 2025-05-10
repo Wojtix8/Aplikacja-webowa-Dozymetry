@@ -1,0 +1,181 @@
+{% load static %}
+{% load custom_tags %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Lista sal</title>
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'fontawesome/css/all.min.css' %}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .list-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 700px;
+        }
+        .sala-block {
+            border-bottom: 1px solid #eee;
+            padding: 15px 0;
+            position: relative;
+        }
+        .sala-header {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            padding-right: 70px;
+        }
+        .sprzet-info, .dozymetr-info {
+            margin-left: 15px;
+            font-size: 0.9em;
+            line-height: 1.3;
+        }
+        .sprzet-info ul, .dozymetr-info ul {
+            padding-left: 20px;
+            margin: 5px 0;
+        }
+        .sprzet-info li, .dozymetr-info li {
+            margin-bottom: 5px;
+        }
+        .btn-tile {
+            display: inline-block;
+            padding: 10px 18px;
+            border-radius: 10px;
+            background-color: #d1e7dd;
+            text-decoration: none;
+            margin-top: 18px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .btn-tile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .btn-export {
+            display: inline-block;
+            padding: 10px 18px;
+            border-radius: 10px;
+            background-color: #cfe2ff;
+            text-decoration: none;
+            margin-top: 18px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            margin-left: 10px;
+        }
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            background-color: #b8d4ff;
+        }
+        .btn-tile-delete {
+            position: absolute;
+            right: 5px;
+            top: 15px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background-color: #f8d7da;
+            border: none;
+            font-size: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .btn-tile-delete:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+            background-color: #f5c2c7;
+        }
+        .btn-back {
+            display: inline-block;
+            padding: 10px 18px;
+            border-radius: 10px;
+            background-color: #dadada;
+            text-decoration: none;
+            margin-top: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .text-muted { color: #6c757d; }
+    </style>
+</head>
+<body>
+<div class="list-container">
+    <h1 style="margin-bottom: 20px; text-align: center;"><i class="fas fa-building"></i> Lista sal</h1>
+    
+    {% if sale %}
+        {% for sala in sale %}
+        <div class="sala-block">
+            <form method="post" action="{% url 'sala_delete' sala.pk %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn-tile-delete" onclick="return confirm('Czy na pewno chcesz usunąć tę salę?')">
+                    <i class="fas fa-trash-alt"></i> Usuń
+                </button>
+            </form>
+            
+            <div class="sala-header">
+                Sala {{ sala.nr_sali }} – oddział {{ sala.oddzial }}
+            </div>
+
+            {% if sprzety_by_sala|get_item:sala %}
+                <div class="sprzet-info">
+                    <strong>Sprzęty:</strong>
+                    <ul>
+                    {% for sprzet in sprzety_by_sala|get_item:sala %}
+                        <li>{{ sprzet.nazwa }} – rok {{ sprzet.rok_produkcji }}, ref: {{ sprzet.numer_ref }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="sprzet-info text-muted">Brak sprzętu</div>
+            {% endif %}
+
+            {% if dozymetry_by_sala|get_item:sala %}
+                <div class="dozymetr-info">
+                    <strong>Dozymetry:</strong>
+                    <ul>
+                    {% for dz in dozymetry_by_sala|get_item:sala %}
+                        <li>ID: {{ dz.IDdozymetru }} – status: {{ dz.status }} – kalibracja: {{ dz.data_ostatniej_kalibracji }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="dozymetr-info text-muted">Brak dozymetrów</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted" style="text-align: center;">Brak sal w bazie.</p>
+    {% endif %}
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <a href="{% url 'sala_create' %}" class="btn-tile"><i class="fas fa-plus"></i> Dodaj salę</a>
+        <a href="{% url 'export_xlsx' 'sale' %}" class="btn-export">
+            <i class="fas fa-file-excel"></i> Eksportuj do Excel
+        </a>
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 15px;">
+    <a href="{% url 'home' %}" class="btn-back">
+        <i class="fas fa-home"></i> Powrót do startu
+    </a>
+</div>
+
+{% include "cursor.html" %}
+</body>
+</html>
