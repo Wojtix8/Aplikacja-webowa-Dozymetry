@@ -15,13 +15,38 @@ class Osoba(models.Model):
         return f"{self.imie} {self.nazwisko}"
 
 class Sprzet(models.Model):
-    nazwa = models.CharField(max_length=100)
-    rok_produkcji = models.PositiveSmallIntegerField(null=True, blank=True)
-    numer_ref = models.CharField(max_length=50, unique=True)
-    sala = models.ForeignKey(Sala, on_delete=models.CASCADE, related_name='sprzety')
+    STATUS_CHOICES = [
+        ('aktywne', 'Aktywne'),
+        ('w_naprawie', 'W naprawie'),
+        ('wycofane', 'Wycofane'),
+        ('uszkodzone', 'Uszkodzone'),
+    ]
+
+    TYP_SPRZETU_CHOICES = [
+        ('RTG', 'Aparat RTG'),
+        ('TK', 'Tomograf komputerowy'),
+        ('USG', 'Ultrasonograf'),
+        ('PET', 'PET'),
+        ('SPECT', 'SPECT'),
+        ('MRI', 'Rezonans magnetyczny'),
+        ('CID', 'Detektor promieniowania jonizującego'),
+        ('GAUGE', 'Miernik promieniowania'),
+        ('INNE', 'Inne'),
+    ]
+
+    model = models.CharField(max_length=100)
+    producent = models.CharField(max_length=100)
+    typ_sprzetu = models.CharField(max_length=50, choices=TYP_SPRZETU_CHOICES)
+    data_ostatniego_przegladu = models.DateField(blank=True, null=True)
+    promieniujacy = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='aktywne')
+    numer_seryjny = models.CharField(max_length=100)
+    rok_zakupu = models.CharField(max_length=4)  
+    numer_kontaktowy_serwis = models.CharField(max_length=20, blank=True, null=True)
+    sala = models.ForeignKey(Sala, on_delete=models.CASCADE)
 
     def __str__(self):
-        return self.nazwa
+        return f"{self.nazwa} – {self.producent_model}"
 
 class Dozymetr(models.Model):
     STATUS_CHOICES = [

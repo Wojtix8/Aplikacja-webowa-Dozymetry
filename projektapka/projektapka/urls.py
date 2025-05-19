@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from mojaapka.views import startowa_strona
 from mojaapka import views
+from mojaapka.views import ImportXLSXView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -45,7 +46,7 @@ urlpatterns = [
     
     path('', views.home_view, name='home'),
     path('export/xlsx/<str:model_name>/', views.ExportXLSXView.as_view(), name='export_xlsx'),
-    #path('import/<str:model_type>/', views.import_xlsx, name='import_xlsx'),
+    path('import/xlsx/<str:model_name>/', ImportXLSXView.as_view(), name='import_xlsx'),
 
 
 ]

@@ -14,7 +14,21 @@ class OsobaForm(forms.ModelForm):
 class SprzetForm(forms.ModelForm):
     class Meta:
         model = Sprzet
-        fields = ['nazwa', 'rok_produkcji', 'numer_ref', 'sala']
+        fields = [
+            'model',
+            'producent',
+            'typ_sprzetu',
+            'data_ostatniego_przegladu',
+            'promieniujacy',
+            'status',
+            'numer_seryjny',
+            'rok_zakupu',
+            'numer_kontaktowy_serwis',
+            'sala',
+        ]
+        widgets = {
+            'data_ostatniego_przegladu': forms.DateInput(attrs={'type': 'date'}),
+        }
 
 class DozymetrForm(forms.ModelForm):
     class Meta:

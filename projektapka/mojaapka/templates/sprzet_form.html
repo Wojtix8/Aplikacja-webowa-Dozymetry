@@ -53,7 +53,18 @@
     <h1><i class="fas fa-tools text-warning"></i> Dodaj sprzęt</h1>
     <form method="post">
         {% csrf_token %}
-        {{ form.as_p }}
+
+        <div class="mb-3">{{ form.model.label_tag }} {{ form.model }}</div>
+        <div class="mb-3">{{ form.producent.label_tag }} {{ form.producent }}</div>
+        <div class="mb-3">{{ form.typ_sprzetu.label_tag }} {{ form.typ_sprzetu }}</div>
+        <div class="mb-3">{{ form.data_ostatniego_przegladu.label_tag }} {{ form.data_ostatniego_przegladu }}</div>
+        <div class="mb-3">{{ form.promieniujacy.label_tag }} {{ form.promieniujacy }}</div>
+        <div class="mb-3">{{ form.status.label_tag }} {{ form.status }}</div>
+        <div class="mb-3">{{ form.numer_seryjny.label_tag }} {{ form.numer_seryjny }}</div>
+        <div class="mb-3">{{ form.rok_zakupu.label_tag }} {{ form.rok_zakupu }}</div>
+        <div class="mb-3">{{ form.numer_kontaktowy_serwis.label_tag }} {{ form.numer_kontaktowy_serwis }}</div>
+        <div class="mb-3">{{ form.sala.label_tag }} {{ form.sala }}</div>
+
         <button type="submit" class="btn btn-warning mt-3"><i class="fas fa-save"></i> Zapisz</button>
     </form>
     <div style="text-align: center;">
@@ -61,8 +72,7 @@
             <i class="fas fa-arrow-left"></i> Powrót do listy sprzętów</a>
     </div>
 
-{% include "cursor.html" %}
-
+    {% include "cursor.html" %}
 </div>
 </body>
 </html>

@@ -10,18 +10,27 @@
         body {
             background: linear-gradient(135deg, #dbeafe, #e0f2fe);
             font-family: 'Segoe UI', sans-serif;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
             cursor: none;
-        }
-
-        .center-content {
-            height: 100%;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             padding: 20px;
+            margin-top: -50 px;
+        }
+
+        .page-title {
+            color: #000;
+            font-weight: 600;
+            margin-bottom: 30px;
         }
 
         .card-container {
@@ -29,7 +38,7 @@
             flex-wrap: wrap;
             justify-content: center;
             gap: 30px;
-            margin-top: 30px;
+            margin-top: 40px;
         }
 
         .card-tile {
@@ -71,7 +80,6 @@
             background-color: #f8d7da;
         }
 
-        /* Style dla obrazków pod kafelkami */
         .card-image-container {
             position: relative;
             width: 100%;
@@ -96,17 +104,28 @@
             opacity: 1;
         }
 
-        /* Czarny nagłówek */
-        .page-title {
-            color: #000;
-            font-weight: 600;
-            margin-bottom: 30px;
+        .chart-container {
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+            top: 100px;
+            text-align: center; 
+        }
+
+        #salaChart {
+            height: 300px !important;
+        }
+
+        .chart-container h3 {
+            text-align: center;
+            font-size: 1.1rem;
         }
     </style>
 </head>
 <body>
     <div class="center-content">
-        <h1 class="page-title">Co chcesz wybrać Drogi użytkowniku?</h1>
+        <h1 class="page-title">{{ message }}</h1>
+
         <div class="card-container">
             <!-- Sala -->
             <a href="{% url 'sala_list' %}" class="card card-tile bg-sala">
@@ -115,7 +134,7 @@
                     <h5>Sala</h5>
                 </div>
                 <div class="card-image-container">
-                    <img src="{% static 'images/sala.png' %}" class="card-image" id="sala-image" alt="Sala">
+                    <img src="{% static 'images/sala.png' %}" class="card-image" alt="Sala">
                 </div>
             </a>
 
@@ -126,7 +145,7 @@
                     <h5>Osoba</h5>
                 </div>
                 <div class="card-image-container">
-                    <img src="{% static 'images/osoba.png' %}" class="card-image" id="osoba-image" alt="Osoba">
+                    <img src="{% static 'images/osoba.png' %}" class="card-image" alt="Osoba">
                 </div>
             </a>
 
@@ -137,7 +156,7 @@
                     <h5>Sprzęt</h5>
                 </div>
                 <div class="card-image-container">
-                    <img src="{% static 'images/sprzet.png' %}" class="card-image" id="sprzet-image" alt="Sprzęt">
+                    <img src="{% static 'images/sprzet.png' %}" class="card-image" alt="Sprzęt">
                 </div>
             </a>
 
@@ -148,14 +167,78 @@
                     <h5>Dozymetr</h5>
                 </div>
                 <div class="card-image-container">
-                    <img src="{% static 'images/dozymetr.png' %}" class="card-image" id="dozymetr-image" alt="Dozymetr">
+                    <img src="{% static 'images/dozymetr.png' %}" class="card-image" alt="Dozymetr">
                 </div>
             </a>
+        </div>
+
+        <!-- WYKRES -->
+        <div class="chart-container">
+            <h3 class="mt-5 mb-3">  ☠️Do tych sal lepiej nie wchodź ☢️</h3>
+            <canvas id="salaChart"></canvas>
         </div>
     </div>
 
     {% include "cursor.html" %}
-
     <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const labelsFull = JSON.parse('{{ chart_labels|escapejs }}');
+        const dataFull = JSON.parse('{{ chart_data|escapejs }}');
+
+        // Top 5 sal
+        const labels = labelsFull.slice(0, 5);
+        const data = dataFull.slice(0, 5);
+
+        const barColors = data.map((_, i) =>
+            i === 0 ? '#90ee90' : '#a9a9a9'
+        );
+
+        const ctx = document.getElementById('salaChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Liczba promieniujących sprzętów',
+                    data: data,
+                    backgroundColor: barColors,
+                    borderColor: barColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Sale'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Liczba promieniujących sprzętów'
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.parsed.y} promieniujących`
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>

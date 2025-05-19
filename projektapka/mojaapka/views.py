@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from datetime import date, timedelta
 from .models import Sala, Osoba, Sprzet, Dozymetr
 from .forms import SalaForm, OsobaForm, SprzetForm, DozymetrForm
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Count, Q
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.http import HttpResponse
@@ -11,6 +11,11 @@ import openpyxl
 from io import BytesIO
 from django.http import HttpResponseBadRequest
 import pandas as pd
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.datastructures import MultiValueDictKeyError
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+import json
+
 
 def startowa_strona(request):
     context = {
@@ -21,11 +26,24 @@ def startowa_strona(request):
     if request.method == 'POST':
         context['selected'] = request.POST.get('wybor', 'Nic nie wybrano')
 
-    return render(request, 'start.html', context)
+    sala_counts = (
+        Sala.objects
+        .annotate(prom_count=Count('sprzet', filter=Q(sprzet__promieniujacy=True)))
+        .order_by('-prom_count')
+    )
 
+    context['chart_labels'] = json.dumps([s.nr_sali or 'Brak' for s in sala_counts])
+    context['chart_data'] = json.dumps([s.prom_count for s in sala_counts])
+
+    return render(request, 'start.html', context)
 # Lista i tworzenie Sali
 def sala_list(request):
-    sale = Sala.objects.all()
+    sale_all = Sala.objects.all()
+    paginator = Paginator(sale_all, 4)  
+
+    page_number = request.GET.get('page')
+    sale = paginator.get_page(page_number)
+
     sprzety = Sprzet.objects.all()
     dozymetry = Dozymetr.objects.select_related('sala')
 
@@ -56,32 +74,46 @@ def sala_create(request):
 
 # Lista i tworzenie Osoby
 def osoba_list(request):
-    osoby = Osoba.objects.all()
-    dozymetry = Dozymetr.objects.select_related('osoba')
-    
-    dozymetry_by_osoba = {}
+    osoby_list = Osoba.objects.all()
+    paginator = Paginator(osoby_list, 4) 
+    page = request.GET.get('page')
 
+    try:
+        osoby = paginator.get_page(page)
+    except PageNotAnInteger:
+        osoby = paginator.get_page(1)
+    except EmptyPage:
+        osoby = paginator.get_page(paginator.num_pages)
+
+    dozymetry = Dozymetr.objects.select_related('osoba')
+
+    dozymetry_by_osoba = {}
     for d in dozymetry:
         if d.osoba not in dozymetry_by_osoba:
             dozymetry_by_osoba[d.osoba] = []
         
-        # Obliczenie daty najbliższej kontroli(dodajemy 90 dni do daty ostatniej kontroli)
-        next_calibration_date = d.data_ostatniej_kontroli + timedelta(days=90)
-        
-        # Obliczamy liczbę dni do następnej kontroli
-        days_left = (next_calibration_date - date.today()).days
-        
+        if d.data_ostatniej_kontroli:
+            next_calibration_date = d.data_ostatniej_kontroli + timedelta(days=90)
+            days_left = (next_calibration_date - date.today()).days
+            needs_calibration_alert = days_left < 14
+        else:
+            next_calibration_date = None
+            days_left = None
+            needs_calibration_alert = True
+
         dozymetry_by_osoba[d.osoba].append({
             'id': d.IDdozymetru,
             'data_kontroli': d.data_ostatniej_kontroli,
+            'next_calibration_date': next_calibration_date,
             'days_left': days_left,
-            'needs_calibration_alert': days_left < 14  # Dodajemy flagę dla alertu
+            'needs_calibration_alert': needs_calibration_alert,
         })
 
-    return render(request, 'osoba_list.html', {
-        'osoby': osoby,
-        'dozymetry_by_osoba': dozymetry_by_osoba
-    })
+    context = {
+        'osoby': osoby,  
+        'dozymetry_by_osoba': dozymetry_by_osoba,
+    }
+    return render(request, 'osoba_list.html', context)
 
 def osoba_create(request):
     if request.method == 'POST':
@@ -95,7 +127,36 @@ def osoba_create(request):
 
 # Lista i tworzenie Sprzętu
 def sprzet_list(request):
-    return render(request, 'sprzet_list.html', {'sprzety': Sprzet.objects.select_related('sala').all()})
+    sprzety_list = Sprzet.objects.select_related('sala').all()
+
+    # Filtrowanie
+    sala = request.GET.get('sala')
+    promieniujacy = request.GET.get('promieniujacy')
+
+    if sala:
+        sprzety_list = sprzety_list.filter(sala__nr_sali__icontains=sala)
+
+    if promieniujacy == 'true':
+        sprzety_list = sprzety_list.filter(promieniujacy=True)
+    elif promieniujacy == 'false':
+        sprzety_list = sprzety_list.filter(promieniujacy=False)
+
+    # Paginacja
+    paginator = Paginator(sprzety_list, 10)
+    page = request.GET.get('page')
+
+    try:
+        sprzety = paginator.page(page)
+    except PageNotAnInteger:
+        sprzety = paginator.page(1)
+    except EmptyPage:
+        sprzety = paginator.page(paginator.num_pages)
+
+    return render(request, 'sprzet_list.html', {
+        'sprzety': sprzety,
+        'sale': Sala.objects.all(),  
+        'request': request 
+    })
 
 def sprzet_create(request):
     if request.method == 'POST':
@@ -109,7 +170,19 @@ def sprzet_create(request):
 
 # Lista i tworzenie Dozymetrów
 def dozymetr_list(request):
-    return render(request, 'dozymetr_list.html', {'dozymetry': Dozymetr.objects.select_related('sala','osoba').all()})
+    dozymetry_qs = Dozymetr.objects.select_related('sala', 'osoba').all()
+
+    paginator = Paginator(dozymetry_qs, 4)  
+    page_number = request.GET.get('page')
+
+    try:
+        dozymetry = paginator.page(page_number)
+    except PageNotAnInteger:
+        dozymetry = paginator.page(1)
+    except EmptyPage:
+        dozymetry = paginator.page(paginator.num_pages)
+
+    return render(request, 'dozymetr_list.html', {'dozymetry': dozymetry})
 
 def dozymetr_create(request):
     if request.method == 'POST':
@@ -179,7 +252,8 @@ class ExportXLSXView(View):
         },
         'sprzety': {
             'model': Sprzet,
-            'fields': ['nazwa', 'rok_produkcji', 'numer_ref', 'sala'],
+            'fields': ['nazwa','producent_model','typ_sprzetu','data_ostatniego_przegladu','promieniujacy','status',
+            'numer_seryjny','rok_zakupu','numer_kontaktowy_serwis','numer_ref','sala',],
             'filename': 'lista_sprzetu.xlsx'
         },
         'dozymetry': {
@@ -224,4 +298,100 @@ class ExportXLSXView(View):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
+class ImportXLSXView(View):
+    """
+    Obsługuje POST na /import/xlsx/<model_name>/
+    Excel musi mieć nagłówki zgodne z required_columns.
+    """
+    required = {
+        'sale':   ['nr_sali', 'oddzial'],
+        'osoby':  ['imie', 'nazwisko'],
+        'sprzety': ['model', 'producent', 'typ_sprzetu',
+                    'data_ostatniego_przegladu', 'promieniujacy',
+                    'status', 'numer_seryjny', 'rok_zakupu',
+                    'numer_kontaktowy_serwis', 'sala'],
+        'dozymetry': ['IDdozymetru','data_ostatniej_kontroli','status','typ','sala','osoba'],
+    }
 
+    def post(self, request, model_name):
+        if model_name not in self.required:
+            return HttpResponseBadRequest("Nieobsługiwany model do importu.")
+
+        f = request.FILES.get('file')
+        if not f:
+            return HttpResponseBadRequest("Nie przesłano pliku.")
+
+        try:
+            wb = openpyxl.load_workbook(f)
+            ws = wb.active
+            headers = [cell.value for cell in ws[1]]
+            req = self.required[model_name]
+            missing_cols = set(req) - set(headers)
+            if missing_cols:
+                return HttpResponseBadRequest(
+                    f"Brak kolumn: {', '.join(missing_cols)}"
+                )
+
+            created = 0
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                data = dict(zip(headers, row))
+                if model_name == 'sale':
+                    Sala.objects.get_or_create(
+                        nr_sali=str(data['nr_sali']).strip(),
+                        oddzial=str(data['oddzial']).strip()
+                    )
+                elif model_name == 'osoby':
+                    Osoba.objects.get_or_create(
+                        imie=str(data['imie']).strip(),
+                        nazwisko=str(data['nazwisko']).strip()
+                    )
+                elif model_name == 'sprzety':
+                    sala = Sala.objects.get(nr_sali=str(data['sala']).strip())
+                    Sprzet.objects.create(
+                        model=data['model'],
+                        producent=data['producent'],
+                        typ_sprzetu=data['typ_sprzetu'],
+                        data_ostatniego_przegladu=data.get('data_ostatniego_przegladu'),
+                        promieniujacy=bool(data['promieniujacy']),
+                        status=data['status'],
+                        numer_seryjny=str(data['numer_seryjny']),
+                        rok_zakupu=str(data['rok_zakupu']),
+                        numer_kontaktowy_serwis=data.get('numer_kontaktowy_serwis'),
+                        sala=sala
+                    )
+                elif model_name == 'dozymetry':
+                    sala = Sala.objects.get(nr_sali=str(data['sala']).strip())
+                    
+                    osoba = None
+                    osoba_raw = str(data['osoba']).strip()
+                    if osoba_raw and osoba_raw.lower() != 'none':
+                        parts = osoba_raw.split()
+                        if len(parts) >= 2:
+                            imie = parts[0].strip()
+                            nazwisko = ' '.join(parts[1:]).strip()
+                            osoba = Osoba.objects.filter(imie__iexact=imie, nazwisko__iexact=nazwisko).first()
+                        else:
+                            raise ValueError(f"Nieprawidłowy format osoby: '{osoba_raw}' (oczekiwano 'Imie Nazwisko')")
+                        
+                    Dozymetr.objects.create(
+                    IDdozymetru=str(data['IDdozymetru']).strip(),
+                    typ=data['typ'].strip(),
+                    status=data['status'].strip(),
+                    data_ostatniej_kontroli=data['data_ostatniej_kontroli'],
+                    sala=sala,
+                    osoba=osoba    
+                    )
+                created += 1
+
+            messages.success(request, f"Pomyślnie zaimportowano {created} rekordów.")
+
+            redirect_map = {
+                'sale': 'sala_list',
+                'osoby': 'osoba_list',
+                'sprzety': 'sprzet_list',
+                'dozymetry': 'dozymetr_list',
+            }
+            return redirect(redirect_map.get(model_name, 'home'))
+
+        except Exception as e:
+            return HttpResponseBadRequest(f"Błąd podczas importu: {e}")
