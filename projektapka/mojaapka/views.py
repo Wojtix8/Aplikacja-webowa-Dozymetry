@@ -36,7 +36,8 @@ def startowa_strona(request):
     context['chart_data'] = json.dumps([s.prom_count for s in sala_counts])
 
     return render(request, 'start.html', context)
-# Lista i tworzenie Sali
+
+# tworzenie sali
 def sala_list(request):
     sale_all = Sala.objects.all()
     paginator = Paginator(sale_all, 4)  
@@ -72,12 +73,11 @@ def sala_create(request):
         form = SalaForm()
     return render(request, 'sala_form.html', {'form': form})
 
-# Lista i tworzenie Osoby
+# tworzenie osoby
 def osoba_list(request):
     osoby_list = Osoba.objects.all()
-    paginator = Paginator(osoby_list, 4) 
+    paginator = Paginator(osoby_list, 4)
     page = request.GET.get('page')
-
     try:
         osoby = paginator.get_page(page)
     except PageNotAnInteger:
@@ -86,34 +86,35 @@ def osoba_list(request):
         osoby = paginator.get_page(paginator.num_pages)
 
     dozymetry = Dozymetr.objects.select_related('osoba')
-
     dozymetry_by_osoba = {}
-    for d in dozymetry:
-        if d.osoba not in dozymetry_by_osoba:
-            dozymetry_by_osoba[d.osoba] = []
-        
-        if d.data_ostatniej_kontroli:
-            next_calibration_date = d.data_ostatniej_kontroli + timedelta(days=90)
-            days_left = (next_calibration_date - date.today()).days
-            needs_calibration_alert = days_left < 14
-        else:
-            next_calibration_date = None
-            days_left = None
-            needs_calibration_alert = True
 
-        dozymetry_by_osoba[d.osoba].append({
+    for d in dozymetry:
+        osoba = d.osoba
+        if osoba not in dozymetry_by_osoba:
+            dozymetry_by_osoba[osoba] = []
+
+        if d.data_ostatniej_kontroli:
+            next_calibration = d.data_ostatniej_kontroli + timedelta(days=90)
+            days_left = (next_calibration - date.today()).days
+            needs_alert = days_left < 14
+        else:
+            next_calibration = None
+            days_left = None
+            needs_alert = True
+
+        dozymetry_by_osoba[osoba].append({
             'id': d.IDdozymetru,
+            'status': d.status,
+            'status_display': d.get_status_display(),
             'data_kontroli': d.data_ostatniej_kontroli,
-            'next_calibration_date': next_calibration_date,
             'days_left': days_left,
-            'needs_calibration_alert': needs_calibration_alert,
+            'needs_alert': needs_alert,
         })
 
-    context = {
-        'osoby': osoby,  
+    return render(request, 'osoba_list.html', {
+        'osoby': osoby,
         'dozymetry_by_osoba': dozymetry_by_osoba,
-    }
-    return render(request, 'osoba_list.html', context)
+    })
 
 def osoba_create(request):
     if request.method == 'POST':
@@ -125,11 +126,10 @@ def osoba_create(request):
         form = OsobaForm()
     return render(request, 'osoba_form.html', {'form': form})
 
-# Lista i tworzenie Sprzętu
+# tworzenie sprzętu
 def sprzet_list(request):
     sprzety_list = Sprzet.objects.select_related('sala').all()
 
-    # Filtrowanie
     sala = request.GET.get('sala')
     promieniujacy = request.GET.get('promieniujacy')
 
@@ -141,7 +141,6 @@ def sprzet_list(request):
     elif promieniujacy == 'false':
         sprzety_list = sprzety_list.filter(promieniujacy=False)
 
-    # Paginacja
     paginator = Paginator(sprzety_list, 10)
     page = request.GET.get('page')
 
@@ -168,11 +167,11 @@ def sprzet_create(request):
         form = SprzetForm()
     return render(request, 'sprzet_form.html', {'form': form})
 
-# Lista i tworzenie Dozymetrów
+# tworzenie dozymetrów
 def dozymetr_list(request):
     dozymetry_qs = Dozymetr.objects.select_related('sala', 'osoba').all()
 
-    paginator = Paginator(dozymetry_qs, 4)  
+    paginator = Paginator(dozymetry_qs, 4)
     page_number = request.GET.get('page')
 
     try:
@@ -182,7 +181,20 @@ def dozymetr_list(request):
     except EmptyPage:
         dozymetry = paginator.page(paginator.num_pages)
 
-    return render(request, 'dozymetr_list.html', {'dozymetry': dozymetry})
+    for d in dozymetry:
+        if d.data_ostatniej_kontroli:
+            next_date = d.data_ostatniej_kontroli + timedelta(days=90)
+            days_left = (next_date - date.today()).days
+            needs_alert = days_left < 14
+        else:
+            days_left = None
+            needs_alert = True
+        d.days_left = days_left
+        d.needs_alert = needs_alert
+
+    return render(request, 'dozymetr_list.html', {
+        'dozymetry': dozymetry
+    })
 
 def dozymetr_create(request):
     if request.method == 'POST':
@@ -197,7 +209,7 @@ def dozymetr_create(request):
 def home_view(request):
     return render(request, 'home.html')
 
-# Widoki do usuwania
+# usuwanie
 @require_POST
 def sala_delete(request, pk):
     sala = get_object_or_404(Sala, pk=pk)
@@ -299,10 +311,7 @@ class ExportXLSXView(View):
         return response
 
 class ImportXLSXView(View):
-    """
-    Obsługuje POST na /import/xlsx/<model_name>/
-    Excel musi mieć nagłówki zgodne z required_columns.
-    """
+
     required = {
         'sale':   ['nr_sali', 'oddzial'],
         'osoby':  ['imie', 'nazwisko'],

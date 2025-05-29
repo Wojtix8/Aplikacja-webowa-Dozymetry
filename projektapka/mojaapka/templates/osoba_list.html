@@ -1,3 +1,4 @@
+{# templates/osoba_list.html #}
 {% load static %}
 {% load custom_tags %}
 <!DOCTYPE html>
@@ -43,7 +44,7 @@
             margin: 5px 0;
         }
         .dozymetr-info li {
-            margin-bottom: 5px;
+            margin-bottom: 10px;
         }
         .btn-tile, .btn-export, .btn-import {
             display: inline-block;
@@ -112,23 +113,14 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
-        .alert-calibration {
-            color: #e74c3c;
-            font-weight: bold;
-        }
+        .status-active   { color: #28a745; font-weight: bold; }
+        .status-warning  { color: #824545; font-weight: bold; }
+        .status-inactive { color: #6c757d; }
+        .alert-calibration { color: #e74c3c; font-weight: bold; }
         .text-muted { color: #6c757d; }
-        .top-buttons {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .bottom-buttons {
-            text-align: center;
-            margin-top: 20px;
-        }
-        .pagination {
-            margin-top: 20px;
-            justify-content: center;
-        }
+        .top-buttons { text-align: center; margin-bottom: 20px; }
+        .bottom-buttons { text-align: center; margin-top: 20px; }
+        .pagination { margin-top: 20px; justify-content: center; }
     </style>
 </head>
 <body>
@@ -140,13 +132,11 @@
 
     <div class="top-buttons">
         <a href="{% url 'osoba_create' %}" class="btn-tile"><i class="fas fa-plus"></i> Dodaj osobę</a>
-        <a href="{% url 'export_xlsx' 'osoby' %}" class="btn-export">
-            <i class="fas fa-file-excel"></i> Eksportuj do Excel
-        </a>
-        <form id="importForm" method="post" action="{% url 'import_xlsx' 'osoby' %}" enctype="multipart/form-data" style="display: inline;">
+        <a href="{% url 'export_xlsx' 'osoby' %}" class="btn-export"><i class="fas fa-file-excel"></i> Eksportuj do Excel</a>
+        <form method="post" action="{% url 'import_xlsx' 'osoby' %}" enctype="multipart/form-data" style="display: inline;">
             {% csrf_token %}
-            <input type="file" id="fileInput" name="file" accept=".xlsx,.xls" style="display: none;" onchange="document.getElementById('importForm').submit();">
-            <button type="button" class="btn-import" onclick="document.getElementById('fileInput').click();">
+            <input type="file" name="file" accept=".xlsx,.xls" style="display: none;" onchange="this.form.submit();">
+            <button type="button" class="btn-import" onclick="this.previousElementSibling.click();">
                 <i class="fas fa-file-upload"></i> Importuj Excel
             </button>
         </form>
@@ -154,50 +144,55 @@
 
     {% if osoby %}
         {% for osoba in osoby %}
-        <div class="person-block">
-            <form method="post" action="{% url 'osoba_delete' osoba.pk %}" style="display: inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn-tile-delete" onclick="return confirm('Czy na pewno chcesz usunąć tę osobę?')">
-                    <i class="fas fa-trash-alt"></i> Usuń
-                </button>
-            </form>
-            <div class="person-header">
-                {{ osoba.imie }} {{ osoba.nazwisko }}
-            </div>
+            <div class="person-block">
+                <form method="post" action="{% url 'osoba_delete' osoba.pk %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-tile-delete" onclick="return confirm('Czy na pewno chcesz usunąć tę osobę?')">
+                        <i class="fas fa-trash-alt"></i> Usuń
+                    </button>
+                </form>
 
-            {% if dozymetry_by_osoba|get_item:osoba %}
-                <div class="dozymetr-info">
-                    <ul>
-                        {% for d in dozymetry_by_osoba|get_item:osoba %}
-                        <li>
-                            Dozymetr ID: {{ d.id }}<br>
-                            Ostatnia kontrola: {{ d.data_kontroli }}<br>
-                            Dni do kolejnej kontroli:
-                            {% if d.needs_calibration_alert %}
-                                <span class="alert-calibration">{{ d.days_left }} – konieczna kontrola!</span>
-                            {% else %}
-                                {{ d.days_left }}
-                            {% endif %}
-                        </li>
-                        {% endfor %}
-                    </ul>
+                <div class="person-header">
+                    {{ osoba.imie }} {{ osoba.nazwisko }}
                 </div>
-            {% else %}
-                <div class="dozymetr-info text-muted">Brak przypisanego dozymetru</div>
-            {% endif %}
-        </div>
+
+                {% with dozymetry=dozymetry_by_osoba|get_item:osoba %}
+                    {% if dozymetry %}
+                        <div class="dozymetr-info">
+                            <ul>
+                                {% for d in dozymetry %}
+                                    <li>
+                                        <strong>Dozymetr ID:</strong> {{ d.id }}
+                                        &nbsp;
+                                        <span class="{% if d.status == 'aktywny' %}status-active{% elif d.status == 'w_naprawie' %}status-warning{% else %}status-inactive{% endif %}">
+                                            {{ d.status_display }}
+                                        </span>
+                                        <br>
+                                        {% if d.status == 'aktywny' %}
+                                            <strong>Ostatnia kontrola:</strong> {{ d.data_kontroli }}<br>
+                                            <strong>Dni do kolejnej kontroli:</strong>
+                                            {% if d.needs_alert %}
+                                                <span class="alert-calibration">{{ d.days_left }} – konieczna kontrola!</span>
+                                            {% else %}
+                                                {{ d.days_left }}
+                                            {% endif %}
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% else %}
+                        <div class="dozymetr-info text-muted">Brak przypisanego dozymetru</div>
+                    {% endif %}
+                {% endwith %}
+            </div>
         {% endfor %}
 
-        <!-- PAGINACJA -->
-        <nav aria-label="Stronicowanie osób" class="mt-4 d-flex justify-content-center">
+        <nav aria-label="Stronicowanie osób" class="pagination-wrapper">
             <ul class="pagination">
                 {% if osoby.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page=1">&laquo; Pierwsza</a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ osoby.previous_page_number }}">«</a>
-                    </li>
+                    <li class="page-item"><a class="page-link" href="?page=1">&laquo; Pierwsza</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ osoby.previous_page_number }}">«</a></li>
                 {% else %}
                     <li class="page-item disabled"><span class="page-link">&laquo; Pierwsza</span></li>
                     <li class="page-item disabled"><span class="page-link">«</span></li>
@@ -212,28 +207,22 @@
                 {% endfor %}
 
                 {% if osoby.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ osoby.next_page_number }}">»</a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ osoby.paginator.num_pages }}">Ostatnia &raquo;</a>
-                    </li>
+                    <li class="page-item"><a class="page-link" href="?page={{ osoby.next_page_number }}">»</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ osoby.paginator.num_pages }}">Ostatnia &raquo;</a></li>
                 {% else %}
                     <li class="page-item disabled"><span class="page-link">»</span></li>
                     <li class="page-item disabled"><span class="page-link">Ostatnia &raquo;</span></li>
                 {% endif %}
             </ul>
         </nav>
-
     {% else %}
-        <p class="text-muted" style="text-align: center;">Brak aktualnie osób w bazie.</p>
+        <p class="text-center text-muted">Brak aktualnie osób w bazie.</p>
     {% endif %}
+
 </div>
 
 <div class="bottom-buttons">
-    <a href="{% url 'home' %}" class="btn-back">
-        <i class="fas fa-home"></i> Powrót do startu
-    </a>
+    <a href="{% url 'home' %}" class="btn-back"><i class="fas fa-home"></i> Powrót do startu</a>
 </div>
 
 {% include "cursor.html" %}

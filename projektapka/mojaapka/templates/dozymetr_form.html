@@ -30,6 +30,15 @@
         button {
             width: 100%;
         }
+        .custom-save-button {
+            background-color: #e14958; 
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+
         .back-button {
             display: inline-block;
             margin-top: 20px;
@@ -54,15 +63,16 @@
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit" class="btn btn-warning mt-3"><i class="fas fa-save"></i> Zapisz</button>
+        <button type="submit" class="custom-save-button mt-3">
+            <i class="fas fa-save"></i> Zapisz
+        </button>
     </form>
     <div style="text-align: center;">
         <a href="{% url 'dozymetr_list' %}" class="back-button">
             <i class="fas fa-arrow-left"></i> Powrót do listy dozymetrów</a>
     </div>
 
-{% include "cursor.html" %}
-
+    {% include "cursor.html" %}
 </div>
 </body>
 </html>

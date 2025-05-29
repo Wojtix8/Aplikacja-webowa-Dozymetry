@@ -44,6 +44,7 @@ urlpatterns = [
     path('dozymetr/dodaj/', views.dozymetr_create, name='dozymetr_create'),
     path('dozymetr/<str:pk>/usun/', views.dozymetr_delete, name='dozymetr_delete'),
     
+    #inport/export XLSX
     path('', views.home_view, name='home'),
     path('export/xlsx/<str:model_name>/', views.ExportXLSXView.as_view(), name='export_xlsx'),
     path('import/xlsx/<str:model_name>/', ImportXLSXView.as_view(), name='import_xlsx'),

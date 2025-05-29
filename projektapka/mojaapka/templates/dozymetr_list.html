@@ -1,3 +1,4 @@
+{# templates/dozymetr_list.html #}
 {% load static %}
 <!DOCTYPE html>
 <html lang="pl">
@@ -112,28 +113,26 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
-        .status-active { color: #28a745; font-weight: bold; }
+        .status-active   { color: #28a745; font-weight: bold; }
+        .status-warning  { color: #824545; font-weight: bold; }
         .status-inactive { color: #6c757d; }
-        .status-warning { color: #dc3545; font-weight: bold; }
+        .alert-calibration { color: #e74c3c; font-weight: bold; }
         .text-muted { color: #6c757d; }
     </style>
 </head>
 <body>
 <div class="list-container">
-    <h1 style="margin-bottom: 25px; text-align: center;"><i class="fas fa-radiation-alt text-danger"></i> Lista dozymetrów</h1>
+    <h1 style="margin-bottom: 25px; text-align: center;">
+        <i class="fas fa-radiation-alt text-danger"></i> Lista dozymetrów
+    </h1>
 
-    <!-- Przyciski tylko na górze -->
     <div style="text-align: center; margin-bottom: 25px;">
         <a href="{% url 'dozymetr_create' %}" class="btn-tile"><i class="fas fa-plus"></i> Dodaj dozymetr</a>
-
-        <a href="{% url 'export_xlsx' 'dozymetry' %}" class="btn-export">
-            <i class="fas fa-file-excel"></i> Eksportuj do Excel
-        </a>
-
-        <form id="importFormTop" method="post" action="{% url 'import_xlsx' 'dozymetry' %}" enctype="multipart/form-data" style="display: inline;">
+        <a href="{% url 'export_xlsx' 'dozymetry' %}" class="btn-export"><i class="fas fa-file-excel"></i> Eksportuj do Excel</a>
+        <form method="post" action="{% url 'import_xlsx' 'dozymetry' %}" enctype="multipart/form-data" style="display:inline;">
             {% csrf_token %}
-            <input type="file" id="fileInputTop" name="file" accept=".xlsx,.xls" style="display: none;" onchange="document.getElementById('importFormTop').submit();">
-            <button type="button" class="btn-import" onclick="document.getElementById('fileInputTop').click();">
+            <input type="file" name="file" accept=".xlsx,.xls" style="display:none" onchange="this.form.submit();">
+            <button type="button" class="btn-import" onclick="this.previousElementSibling.click();">
                 <i class="fas fa-file-upload"></i> Importuj Excel
             </button>
         </form>
@@ -141,40 +140,61 @@
 
     {% if dozymetry %}
         {% for dozymetr in dozymetry %}
-        <div class="dozymetr-block">
-            <form method="post" action="{% url 'dozymetr_delete' dozymetr.pk %}" style="display: inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn-tile-delete" onclick="return confirm('Czy na pewno chcesz usunąć ten dozymetr?')">
-                    <i class="fas fa-trash-alt"></i> Usuń
-                </button>
-            </form>
-            
-            <div class="dozymetr-header">
-                ID: {{ dozymetr.IDdozymetru }} – 
-                <span class="{% if dozymetr.status == 'aktywny' %}status-active{% elif dozymetr.status == 'nieaktywny' %}status-inactive{% else %}status-warning{% endif %}">
-                    {{ dozymetr.status }}
-                </span>
-            </div>
+            <div class="dozymetr-block">
+                <form method="post" action="{% url 'dozymetr_delete' dozymetr.pk %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-tile-delete" onclick="return confirm('Czy na pewno chcesz usunąć ten dozymetr?')">
+                        <i class="fas fa-trash-alt"></i> Usuń
+                    </button>
+                </form>
 
-            <div class="dozymetr-info">
-                <p><strong>Typ:</strong> {{ dozymetr.typ }}</p>
-                <p><strong>Data ostatniej kontroli:</strong> {{ dozymetr.data_ostatniej_kontroli }}</p>
-                <p><strong>Sala:</strong> {{ dozymetr.sala|default:"Brak przypisania" }}</p>
-                <p><strong>Osoba:</strong> {% if dozymetr.osoba %}{{ dozymetr.osoba.imie }} {{ dozymetr.osoba.nazwisko }}{% else %}Brak przypisania{% endif %}</p>
+                <div class="dozymetr-header">
+                    ID: {{ dozymetr.IDdozymetru }} –
+                    <span class="
+                        {% if dozymetr.status == 'aktywny' %}status-active
+                        {% elif dozymetr.status == 'w_naprawie' %}status-warning
+                        {% else %}status-inactive{% endif %}
+                    ">
+                        {{ dozymetr.get_status_display }}
+                    </span>
+                </div>
+
+                <div class="dozymetr-info">
+                    <p><strong>Typ:</strong> {{ dozymetr.typ }}</p>
+                    <p><strong>Data ostatniej kontroli:</strong> {{ dozymetr.data_ostatniej_kontroli }}</p>
+                    <p><strong>Sala:</strong> {{ dozymetr.sala|default:"Brak przypisania" }}</p>
+                    <p><strong>Osoba:</strong>
+                        {% if dozymetr.osoba %}
+                            {{ dozymetr.osoba.imie }} {{ dozymetr.osoba.nazwisko }}
+                        {% else %}
+                            Brak przypisania
+                        {% endif %}
+                    </p>
+                    {# tylko dla aktywnych pokaż dni do kolejnej kalibracji #}
+                    {% if dozymetr.status == 'aktywny' %}
+                        <p>
+                            <strong>Dni do kolejnej kontroli:</strong>
+                            {% if dozymetr.days_left is not None %}
+                                {% if dozymetr.days_left < 14 %}
+                                    <span class="alert-calibration">{{ dozymetr.days_left }} – konieczna kontrola!</span>
+                                {% else %}
+                                    {{ dozymetr.days_left }}
+                                {% endif %}
+                            {% else %}
+                                — 
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                </div>
             </div>
-        </div>
         {% endfor %}
 
-        <!-- PAGINACJA -->
+        {# paginacja #}
         <nav aria-label="Stronicowanie dozymetrów" class="mt-4 d-flex justify-content-center">
             <ul class="pagination">
                 {% if dozymetry.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page=1">&laquo; Pierwsza</a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ dozymetry.previous_page_number }}">«</a>
-                    </li>
+                    <li class="page-item"><a class="page-link" href="?page=1">&laquo; Pierwsza</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ dozymetry.previous_page_number }}">«</a></li>
                 {% else %}
                     <li class="page-item disabled"><span class="page-link">&laquo; Pierwsza</span></li>
                     <li class="page-item disabled"><span class="page-link">«</span></li>
@@ -189,19 +209,14 @@
                 {% endfor %}
 
                 {% if dozymetry.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ dozymetry.next_page_number }}">»</a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ dozymetry.paginator.num_pages }}">Ostatnia &raquo;</a>
-                    </li>
+                    <li class="page-item"><a class="page-link" href="?page={{ dozymetry.next_page_number }}">»</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ dozymetry.paginator.num_pages }}">Ostatnia &raquo;</a></li>
                 {% else %}
                     <li class="page-item disabled"><span class="page-link">»</span></li>
                     <li class="page-item disabled"><span class="page-link">Ostatnia &raquo;</span></li>
                 {% endif %}
             </ul>
         </nav>
-
     {% else %}
         <p class="text-muted text-center">Brak dozymetrów w bazie.</p>
     {% endif %}
